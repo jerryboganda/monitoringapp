@@ -17,6 +17,49 @@ migrate((app) => {
         "required": true,
         "system": true,
         "type": "text"
+      },
+      {
+        "id": "text_type",
+        "name": "type",
+        "type": "text",
+        "required": false,
+        "hidden": false,
+        "min": 0,
+        "max": 0,
+        "pattern": ""
+      },
+      {
+        "id": "text_user_id",
+        "name": "user_id",
+        "type": "text",
+        "required": false,
+        "hidden": false,
+        "min": 0,
+        "max": 0,
+        "pattern": ""
+      },
+      {
+        "id": "file_upload",
+        "name": "file",
+        "type": "file",
+        "required": false,
+        "hidden": false,
+        "maxSelect": 1,
+        "maxSize": 52428800,
+        "mimeTypes": [
+          "image/jpeg",
+          "image/png",
+          "image/webp",
+          "audio/mpeg",
+          "audio/mp4",
+          "audio/x-m4a",
+          "audio/m4a",
+          "audio/aac",
+          "audio/ogg",
+          "audio/wav"
+        ],
+        "thumbs": ["100x100"],
+        "protected": false
       }
     ],
     "id": "pbc_1176372605",

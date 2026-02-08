@@ -2,18 +2,31 @@ import 'react-native-url-polyfill/auto';
 import PocketBase from 'pocketbase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Ensure EventSource is globally available for PocketBase realtime
-// @ts-ignore
-global.EventSource = require('eventsource');
-
 // For production: https://mm.polytronx.com
 // For local development on Android emulator, use http://10.0.2.2:8090
 export const pb = new PocketBase('https://mm.polytronx.com');
 
+/**
+ * Helper to get the current authenticated user's ID.
+ * PocketBase JS SDK 0.21+ uses authStore.record (not .model).
+ */
+export const getUserId = (): string => {
+    const record = (pb.authStore as any).record ?? (pb.authStore as any).model;
+    return record?.id || '';
+};
+
+/**
+ * Helper to get the current authenticated user's email.
+ */
+export const getUserEmail = (): string => {
+    const record = (pb.authStore as any).record ?? (pb.authStore as any).model;
+    return record?.email || '';
+};
+
 // Configure PocketBase to use AsyncStorage for persistence
-pb.authStore.onChange((token, model) => {
+pb.authStore.onChange((token, record) => {
     if (token) {
-        AsyncStorage.setItem('pb_auth', JSON.stringify({ token, model }));
+        AsyncStorage.setItem('pb_auth', JSON.stringify({ token, model: record }));
     } else {
         AsyncStorage.removeItem('pb_auth');
     }
@@ -29,7 +42,7 @@ export const initAuth = async () => {
         if (data) {
             const { token, model } = JSON.parse(data);
             pb.authStore.save(token, model);
-            console.log("Auth restored for:", model.email);
+            console.log("Auth restored for:", model?.email);
             return true;
         }
     } catch (e) {

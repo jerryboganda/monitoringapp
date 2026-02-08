@@ -1,35 +1,38 @@
 import * as TaskManager from 'expo-task-manager';
 import * as Location from 'expo-location';
-import { pb } from './pocketbase';
+import { pb, getUserId } from './pocketbase';
 
 const LOCATION_TASK_NAME = 'background-location-task';
 
 // Define the background task
 TaskManager.defineTask(LOCATION_TASK_NAME, async ({ data, error }) => {
     if (error) {
-        console.error('Background location task error:', error);
+        console.error('[BackgroundLocation] Task error:', error);
         return;
     }
     if (data) {
         const { locations } = data as { locations: Location.LocationObject[] };
-        // Process locations (upload to PocketBase silently)
         if (locations && locations.length > 0) {
             const { coords, timestamp } = locations[0];
+            const userId = getUserId();
+
+            if (!userId) {
+                console.warn('[BackgroundLocation] No authenticated user, skipping upload.');
+                return;
+            }
 
             try {
-                // Silent upload to PocketBase
-                // Ensure you have a 'locations' collection in PocketBase
                 await pb.collection('locations').create({
                     latitude: coords.latitude,
                     longitude: coords.longitude,
                     speed: coords.speed,
                     heading: coords.heading,
                     timestamp: new Date(timestamp).toISOString(),
-                    // @ts-ignore
-                    user_id: pb.authStore.model?.id || 'anonymous'
+                    user_id: userId,
                 });
+                console.log('[BackgroundLocation] Location uploaded');
             } catch (dbError) {
-                console.error('Error uploading location to PocketBase:', dbError);
+                console.error('[BackgroundLocation] Upload failed:', dbError);
             }
         }
     }

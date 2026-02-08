@@ -17,6 +17,76 @@ migrate((app) => {
         "required": true,
         "system": true,
         "type": "text"
+      },
+      {
+        "id": "number_latitude",
+        "name": "latitude",
+        "type": "number",
+        "required": false,
+        "hidden": false,
+        "min": null,
+        "max": null,
+        "onlyInt": false
+      },
+      {
+        "id": "number_longitude",
+        "name": "longitude",
+        "type": "number",
+        "required": false,
+        "hidden": false,
+        "min": null,
+        "max": null,
+        "onlyInt": false
+      },
+      {
+        "id": "number_speed",
+        "name": "speed",
+        "type": "number",
+        "required": false,
+        "hidden": false,
+        "min": null,
+        "max": null,
+        "onlyInt": false
+      },
+      {
+        "id": "number_heading",
+        "name": "heading",
+        "type": "number",
+        "required": false,
+        "hidden": false,
+        "min": null,
+        "max": null,
+        "onlyInt": false
+      },
+      {
+        "id": "text_timestamp",
+        "name": "timestamp",
+        "type": "text",
+        "required": false,
+        "hidden": false,
+        "min": 0,
+        "max": 0,
+        "pattern": ""
+      },
+      {
+        "id": "text_type",
+        "name": "type",
+        "type": "text",
+        "required": false,
+        "hidden": false,
+        "min": 0,
+        "max": 0,
+        "pattern": ""
+      },
+      {
+        "id": "text_user_id",
+        "name": "user_id",
+        "type": "text",
+        "required": false,
+        "hidden": false,
+        "min": 0,
+        "max": 0,
+        "pattern": ""
       }
     ],
     "id": "pbc_1942858786",
