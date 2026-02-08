@@ -10,7 +10,7 @@ pb.autoCancellation(false); // Disable auto-cancellation to prevent React Strict
 // Helper to build PocketBase file URL
 const getFileUrl = (record: any, filename: string) => {
     if (!filename) return '';
-    return `${pb.baseURL}/api/files/${record.collectionId || record.collectionName}/${record.id}/${filename}`;
+    return `${pb.baseUrl}/api/files/${record.collectionId || record.collectionName}/${record.id}/${filename}`;
 };
 
 interface LocationLog {
