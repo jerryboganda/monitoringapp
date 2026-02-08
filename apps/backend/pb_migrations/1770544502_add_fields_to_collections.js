@@ -72,6 +72,28 @@ migrate((app) => {
 
   app.save(locations);
 
+  // Add created/updated autodate fields to locations if missing
+  if (!locFieldNames.includes("created")) {
+    locations.fields.push(new Field({
+      "id": "autodate_loc_created",
+      "name": "created",
+      "type": "autodate",
+      "onCreate": true,
+      "onUpdate": false,
+    }));
+  }
+  if (!locFieldNames.includes("updated")) {
+    locations.fields.push(new Field({
+      "id": "autodate_loc_updated",
+      "name": "updated",
+      "type": "autodate",
+      "onCreate": true,
+      "onUpdate": true,
+    }));
+  }
+
+  app.save(locations);
+
   // ── 2. Fix MONITORING_LOGS collection ────────────────────────────────────
   const monLogs = app.findCollectionByNameOrId("monitoring_logs");
   const monFieldNames = monLogs.fields.map(f => f.name);
@@ -112,6 +134,28 @@ migrate((app) => {
 
   app.save(monLogs);
 
+  // Add created/updated autodate fields to monitoring_logs if missing
+  if (!monFieldNames.includes("created")) {
+    monLogs.fields.push(new Field({
+      "id": "autodate_ml_created",
+      "name": "created",
+      "type": "autodate",
+      "onCreate": true,
+      "onUpdate": false,
+    }));
+  }
+  if (!monFieldNames.includes("updated")) {
+    monLogs.fields.push(new Field({
+      "id": "autodate_ml_updated",
+      "name": "updated",
+      "type": "autodate",
+      "onCreate": true,
+      "onUpdate": true,
+    }));
+  }
+
+  app.save(monLogs);
+
   // ── 3. Fix COMMANDS collection ───────────────────────────────────────────
   const commands = app.findCollectionByNameOrId("commands");
   const cmdFieldNames = commands.fields.map(f => f.name);
@@ -146,6 +190,28 @@ migrate((app) => {
       "name": "duration",
       "type": "number",
       "required": false,
+    }));
+  }
+
+  app.save(commands);
+
+  // Add created/updated autodate fields to commands if missing
+  if (!cmdFieldNames.includes("created")) {
+    commands.fields.push(new Field({
+      "id": "autodate_cmd_created",
+      "name": "created",
+      "type": "autodate",
+      "onCreate": true,
+      "onUpdate": false,
+    }));
+  }
+  if (!cmdFieldNames.includes("updated")) {
+    commands.fields.push(new Field({
+      "id": "autodate_cmd_updated",
+      "name": "updated",
+      "type": "autodate",
+      "onCreate": true,
+      "onUpdate": true,
     }));
   }
 

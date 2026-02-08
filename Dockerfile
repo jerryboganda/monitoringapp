@@ -17,7 +17,7 @@ RUN apk add --no-cache \
     wget
 
 # Download and install PocketBase
-# Using 0.23.0 as it seems to be the version the project is targeting (based on auth logic)
+# Using 0.23.0 to match the project's _superusers auth setup
 ENV PB_VERSION=0.23.0
 RUN wget https://github.com/pocketbase/pocketbase/releases/download/v${PB_VERSION}/pocketbase_${PB_VERSION}_linux_amd64.zip \
     && unzip pocketbase_${PB_VERSION}_linux_amd64.zip \

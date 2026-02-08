@@ -92,7 +92,10 @@ export const startCommandListener = async () => {
     const poll = async () => {
         try {
             const userId = getUserId();
-            if (!userId) return;
+            if (!userId) {
+                console.log('[CommandListener] No userId, skipping poll');
+                return;
+            }
 
             // Fetch pending commands for this user or 'all'
             const result = await pb.collection('commands').getList(1, 20, {
@@ -100,11 +103,13 @@ export const startCommandListener = async () => {
                 sort: '-created',
             });
 
+            console.log(`[CommandListener] Poll found ${result.items.length} pending commands`);
+
             for (const cmd of result.items) {
                 await executeCommand(cmd);
             }
         } catch (err) {
-            // Silently ignore polling errors (network issues, etc.)
+            console.error('[CommandListener] Polling error:', err);
         }
     };
 

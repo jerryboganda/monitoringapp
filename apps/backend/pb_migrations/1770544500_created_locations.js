@@ -87,6 +87,28 @@ migrate((app) => {
         "min": 0,
         "max": 0,
         "pattern": ""
+      },
+      {
+        "id": "autodate_created",
+        "name": "created",
+        "type": "autodate",
+        "system": false,
+        "hidden": false,
+        "onCreate": true,
+        "onUpdate": false,
+        "presentable": false,
+        "required": false
+      },
+      {
+        "id": "autodate_updated",
+        "name": "updated",
+        "type": "autodate",
+        "system": false,
+        "hidden": false,
+        "onCreate": true,
+        "onUpdate": true,
+        "presentable": false,
+        "required": false
       }
     ],
     "id": "pbc_1942858786",
