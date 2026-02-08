@@ -6,9 +6,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // @ts-ignore
 global.EventSource = require('eventsource');
 
-// TODO: Replace with your actual PocketBase URL (e.g., http://YOUR_IP:8090)
+// For production: https://mm.polytronx.com
 // For local development on Android emulator, use http://10.0.2.2:8090
-export const pb = new PocketBase('http://10.0.2.2:8090');
+export const pb = new PocketBase('https://mm.polytronx.com');
 
 // Configure PocketBase to use AsyncStorage for persistence
 pb.authStore.onChange((token, model) => {
