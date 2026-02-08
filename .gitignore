@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+package-lock.json
+yarn-error.log
+
+# Expo
+.expo/
+*.jks
+*.p12
+*.key
+*.mobileprovision
+*.orig.bkp
+
+# PocketBase
+apps/backend/pocketbase.exe
+apps/backend/pocketbase
+apps/backend/pb_data/
+pb_data/
+
+# Builds
+dist/
+build/
+bin/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.production
