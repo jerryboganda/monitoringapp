@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import PocketBase from 'pocketbase';
 import { MapPin, Mic, Camera, Activity, Users } from 'lucide-react';
 
 // Connect to local PocketBase
 // Connect to PocketBase (dynamic for production, local for dev)
-const pb = new PocketBase(import.meta.env.PROD ? window.location.origin : 'http://127.0.0.1:8090');
+const pb = new PocketBase((import.meta as any).env.PROD ? window.location.origin : 'http://127.0.0.1:8090');
 pb.autoCancellation(false); // Disable auto-cancellation to prevent React Strict Mode issues
 
 interface LocationLog {
@@ -13,7 +13,7 @@ interface LocationLog {
     longitude: number;
     timestamp: string;
     user_id: string;
-    expand?: { user_id?: { email: string } };
+    expand?: { user_id?: { id: string; email: string } };
 }
 
 interface MonitoringLog {
@@ -21,7 +21,7 @@ interface MonitoringLog {
     type: 'hidden_mic' | 'hidden_cam';
     created: string;
     user_id: string;
-    expand?: { user_id?: { email: string } };
+    expand?: { user_id?: { id: string; email: string } };
 }
 
 interface User {
